@@ -134,7 +134,7 @@ function sortObjectKeys(obj: any): any {
  * INACTIVE Tools (exist but not registered, skip):
  * - multiedit, patch, lsp_diagnostics, lsp_hover
  */
-function extractParameterKey(metadata: { tool: string, parameters?: any }): string {
+export function extractParameterKey(metadata: { tool: string, parameters?: any }): string {
     if (!metadata.parameters) return ''
     
     const { tool, parameters } = metadata

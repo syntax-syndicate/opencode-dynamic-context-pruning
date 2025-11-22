@@ -5,7 +5,7 @@ import type { StateManager } from "./state"
 import { buildAnalysisPrompt } from "./prompt"
 import { selectModel, extractModelFromSession } from "./model-selector"
 import { estimateTokensBatch, formatTokenCount } from "./tokenizer"
-import { detectDuplicates } from "./deduplicator"
+import { detectDuplicates, extractParameterKey } from "./deduplicator"
 
 export class Janitor {
     constructor(
@@ -505,9 +505,16 @@ export class Janitor {
 
     /**
      * Build a summary of tools by grouping them
+     * Uses shared extractParameterKey logic for consistent parameter extraction
      */
     private buildToolsSummary(prunedIds: string[], toolMetadata: Map<string, { tool: string, parameters?: any }>): Map<string, string[]> {
         const toolsSummary = new Map<string, string[]>()
+
+        // Helper function to truncate long strings
+        const truncate = (str: string, maxLen: number = 60): string => {
+            if (str.length <= maxLen) return str
+            return str.slice(0, maxLen - 3) + '...'
+        }
 
         for (const prunedId of prunedIds) {
             const metadata = toolMetadata.get(prunedId)
@@ -517,45 +524,12 @@ export class Janitor {
                     toolsSummary.set(toolName, [])
                 }
 
-                // Helper function to truncate long strings
-                const truncate = (str: string, maxLen: number = 60): string => {
-                    if (str.length <= maxLen) return str
-                    return str.slice(0, maxLen - 3) + '...'
-                }
-
-                // Extract meaningful parameter info based on tool type
-                let paramInfo = ""
-                if (metadata.parameters) {
-                    // For read tool, show filePath
-                    if (toolName === "read" && metadata.parameters.filePath) {
-                        paramInfo = truncate(this.shortenPath(metadata.parameters.filePath), 80)
-                    }
-                    // For list tool, show path
-                    else if (toolName === "list" && metadata.parameters.path) {
-                        paramInfo = truncate(this.shortenPath(metadata.parameters.path), 80)
-                    }
-                    // For bash/command tools, prefer description over command
-                    else if (toolName === "bash") {
-                        if (metadata.parameters.description) {
-                            paramInfo = truncate(metadata.parameters.description, 80)
-                        } else if (metadata.parameters.command) {
-                            paramInfo = truncate(metadata.parameters.command, 80)
-                        }
-                    }
-                    // For other tools, show the first relevant parameter
-                    else if (metadata.parameters.path) {
-                        paramInfo = truncate(this.shortenPath(metadata.parameters.path), 80)
-                    }
-                    else if (metadata.parameters.pattern) {
-                        paramInfo = truncate(metadata.parameters.pattern, 80)
-                    }
-                    else if (metadata.parameters.command) {
-                        paramInfo = truncate(metadata.parameters.command, 80)
-                    }
-                }
-
-                if (paramInfo) {
-                    toolsSummary.get(toolName)!.push(paramInfo)
+                // Use shared parameter extraction logic
+                const paramKey = extractParameterKey(metadata)
+                if (paramKey) {
+                    // Apply path shortening and truncation for display
+                    const displayKey = truncate(this.shortenPath(paramKey), 80)
+                    toolsSummary.get(toolName)!.push(displayKey)
                 }
             }
         }
